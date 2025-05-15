@@ -341,5 +341,52 @@ public class PetStoreServiceTests
 
         return inventoryTests.stream();
     }
-    //What other tests could we add here?
+    @Test
+    @DisplayName("Test getInventory method in PetInventoryService")
+    void testGetInventory() throws PetDataStoreException {
+        // Mock the petRepository's getPetInventory method to return a predefined list of pets
+        List<PetEntity> mockPets = new ArrayList<>(Arrays.asList(
+                new DogEntity(AnimalType.DOMESTIC, FUR, Gender.MALE, Breed.MALTESE, new BigDecimal("750.00"), 1),
+                new DogEntity(AnimalType.DOMESTIC, FUR, Gender.MALE, Breed.POODLE, new BigDecimal("650.00"), 2),
+                new CatEntity(AnimalType.DOMESTIC, Skin.HAIR, Gender.FEMALE, Breed.BURMESE, new BigDecimal("65.00"), 3)
+        ));
+
+        Mockito.lenient().doReturn(mockPets).when(petRepository).getPetInventory();
+
+        // Call the service method
+        List<PetEntity> returnedInventory = petService.getInventory();
+
+        // Verify that the repository's getPetInventory method was called exactly once
+        verify(petRepository, times(1)).getPetInventory();
+
+        // Validate that the returned inventory is the same as the mock data
+        assertNotNull(returnedInventory, "Returned inventory should not be null");
+        assertEquals(3, returnedInventory.size(), "Inventory size should be 3");
+        assertTrue(returnedInventory.containsAll(mockPets), "Returned inventory should contain all mock pets");
+    }
+
+    @Test
+    @DisplayName("Add Duplicate PetEntity Throws Exception")
+    public void addDuplicatePetThrowsException() throws PetDataStoreException, PetInventoryFileNotCreatedException {
+        // Given
+        PetEntity duplicateDog = myPets.get(0); // Existing dog
+        Mockito.doReturn(myPets).when(petRepository).getPetInventory();
+
+        // Simulate a runtime exception wrapping the checked one
+        Mockito.when(petRepository.createPetEntity(Mockito.eq(duplicateDog), Mockito.anyList()))
+                .thenThrow(new RuntimeException(new DuplicatePetStoreRecordException("Duplicate pet")));
+
+        // When & Then
+        Exception exception = assertThrows(RuntimeException.class, () -> {
+            petService.addInventory(PetType.DOG, duplicateDog);
+        });
+
+        // Optionally unwrap and verify the cause
+        assertTrue(exception.getCause() instanceof DuplicatePetStoreRecordException);
+        assertEquals("Duplicate pet", exception.getCause().getMessage());
+
+        verify(petRepository, times(1)).getPetInventory();
+        verify(petRepository, times(1)).createPetEntity(Mockito.eq(duplicateDog), Mockito.anyList());
+    }
+
 }
